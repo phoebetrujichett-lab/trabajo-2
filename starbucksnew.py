@@ -396,10 +396,11 @@ style_matplotlib()
 
 @st.cache_data
 def calcular_metricas_kmeans(df_preprocesado):
-    # Selección de columnas numéricas tal como en tu script original
-    df_solo_num = df_preprocesado.select_dtypes(include=['number', 'bool', 'uint8'])
-    
-    # Estandarización de las dimensiones
+    # Muestreo para KMeans diagnóstico (codo + silueta): resultados estables con 20k
+    MAX_KM = 20000
+    df_work = df_preprocesado.sample(min(MAX_KM, len(df_preprocesado)), random_state=42)
+    df_solo_num = df_work.select_dtypes(include=['number', 'bool', 'uint8'])
+
     scaler = StandardScaler()
     df_scaled = scaler.fit_transform(df_solo_num)
     
@@ -429,12 +430,15 @@ def calcular_metricas_kmeans(df_preprocesado):
 
 @st.cache_data
 def generar_perfilamiento_lca_v2(df_input):
-    df_completo = df_input.copy()
+    # Muestreo para limitar RAM en Streamlit Cloud
+    MAX_PERF = 10000
+    df_sample = df_input.sample(min(MAX_PERF, len(df_input)), random_state=42)
+    df_completo = df_input.copy()   # conservar completo para el perfil final
     columnas_modelo = ['total_spend', 'customer_satisfaction', 'fulfillment_time_min']
-    X_vars = df_completo[columnas_modelo].values
+    X_vars = df_sample[columnas_modelo].values
 
     # Ajuste del modelo StepMix ( Gaussian )
-    model_4_clusters = StepMix(n_components=4, measurement='gaussian', random_state=42, n_init=5)
+    model_4_clusters = StepMix(n_components=4, measurement='gaussian', random_state=42, n_init=3, max_iter=50)
     model_4_clusters.fit(X_vars)
     df_completo['Cluster_LCA'] = model_4_clusters.predict(X_vars)
 
@@ -467,7 +471,12 @@ def generar_perfilamiento_lca_v2(df_input):
 
 @st.cache_data
 def calcular_lca_mixto(df_input):
-    df_lca = df_input.copy()
+    # Muestreo estratégico: LCA en 100k filas colapsa la RAM de Streamlit Cloud
+    MAX_LCA = 8000
+    if len(df_input) > MAX_LCA:
+        df_lca = df_input.sample(MAX_LCA, random_state=42).copy()
+    else:
+        df_lca = df_input.copy()
     
     # Definición de variables según tu modelo jerárquico mixto
     gaussianas = ['total_spend', 'customer_satisfaction', 'fulfillment_time_min'] 
@@ -845,13 +854,20 @@ with tab2:
     """)
 
     # Ejecución protegida de ambos motores algorítmicos con barras de carga independientes
-    with st.spinner("Ejecutando optimización por distancias (K-Means)..."):
-        inercias, silhouette_dict, tabla_comparativa_km, df_scaled = calcular_metricas_kmeans(df_prep)
+    try:
+        with st.spinner("Ejecutando optimización por distancias (K-Means)..."):
+            inercias, silhouette_dict, tabla_comparativa_km, df_scaled = calcular_metricas_kmeans(df_prep)
+    except Exception as e:
+        st.error(f"Error en K-Means: {e}")
+        st.stop()
 
-    with st.spinner("Ejecutando optimización probabilística mixta (StepMix LCA)..."):
-        resultados_lca, tabla_lca, predicciones_lca = calcular_lca_mixto(df)
-        # Inyección de las predicciones definitivas en el DataFrame principal
-        df['mixed_pred_rfm'] = predicciones_lca
+    try:
+        with st.spinner("Ejecutando optimización probabilística mixta (StepMix LCA)..."):
+            resultados_lca, tabla_lca, predicciones_lca = calcular_lca_mixto(df)
+            df['mixed_pred_rfm'] = predicciones_lca
+    except Exception as e:
+        st.error(f"Error en LCA StepMix: {e}")
+        st.stop()
 
     # --- SECCIÓN A: ENFOQUE GEOMÉTRICO (K-MEANS) ---
     st.subheader("1. Optimización Geométrica: K-Means Clustering")
@@ -1089,8 +1105,12 @@ with tab4:
     """)
 
     # Obtenemos los datos de la función con caché
-    with st.spinner("Generando perfilamiento avanzado..."):
-        tabla_maestra_lca, df_lca = generar_perfilamiento_lca_v2(df)  # <-- _v2 aquí también
+    try:
+        with st.spinner("Generando perfilamiento avanzado..."):
+            tabla_maestra_lca, df_lca = generar_perfilamiento_lca_v2(df)
+    except Exception as e:
+        st.error(f"Error en perfilamiento LCA: {e}")
+        st.stop()  # <-- _v2 aquí también
 
     # 1. Tabla Maestra de Perfilamiento
     st.subheader("Tabla Maestra de Caracterización (LCA StepMix)")
