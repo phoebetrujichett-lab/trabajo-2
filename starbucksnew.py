@@ -167,6 +167,7 @@ def load_data(file_path):
 
     return df
 
+@st.cache_data
 def preprocess_data(df):
     df_3 = df.copy()
     age_map = {"18-24":1,"25-34":2,"35-44":3,"45-54":4,"55+":5}
@@ -592,8 +593,12 @@ df      = load_data(FILE_NAME)
 df_prep = preprocess_data(df)
 
 # ── LOGO + SIDEBAR ────────────────────────────────────────────────────────────
-st.logo(_LOGO_TMP, link="https://www.starbucks.com")
-st.sidebar.image(_LOGO_TMP, width=110)
+if os.path.exists(_LOGO_TMP):
+    try:
+        st.logo(_LOGO_TMP, link="https://www.starbucks.com")
+        st.sidebar.image(_LOGO_TMP, width=110)
+    except Exception:
+        pass
 st.sidebar.markdown("## Starbucks Analytics")
 st.sidebar.success(f"**{len(df):,}** registros cargados")
 st.sidebar.markdown("---")
@@ -854,20 +859,43 @@ with tab2:
     """)
 
     # Ejecución protegida de ambos motores algorítmicos con barras de carga independientes
+    # K-Means: corre siempre (rápido con muestra de 20k)
     try:
-        with st.spinner("Ejecutando optimización por distancias (K-Means)..."):
+        with st.spinner("Ejecutando K-Means..."):
             inercias, silhouette_dict, tabla_comparativa_km, df_scaled = calcular_metricas_kmeans(df_prep)
     except Exception as e:
-        st.error(f"Error en K-Means: {e}")
-        st.stop()
+        st.error(f"Error en K-Means: {e}"); st.stop()
 
-    try:
-        with st.spinner("Ejecutando optimización probabilística mixta (StepMix LCA)..."):
-            resultados_lca, tabla_lca, predicciones_lca = calcular_lca_mixto(df)
-            df['mixed_pred_rfm'] = predicciones_lca
-    except Exception as e:
-        st.error(f"Error en LCA StepMix: {e}")
-        st.stop()
+    # LCA StepMix: solo cuando el usuario lo solicita (pesado en RAM)
+    if "lca_done" not in st.session_state:
+        st.session_state["lca_done"] = False
+
+    if not st.session_state["lca_done"]:
+        st.info("⚠️ El modelo LCA (StepMix) requiere mayor procesamiento. "
+                "Haz clic para ejecutarlo cuando estés listo.")
+        if st.button("▶ Ejecutar LCA StepMix", type="primary"):
+            try:
+                with st.spinner("Ejecutando StepMix LCA (puede tardar 1-2 min)..."):
+                    resultados_lca, tabla_lca, predicciones_lca = calcular_lca_mixto(df)
+                    df["mixed_pred_rfm"] = predicciones_lca
+                    st.session_state["lca_done"] = True
+                    st.session_state["resultados_lca"] = resultados_lca
+                    st.session_state["tabla_lca"] = tabla_lca
+                    st.session_state["predicciones_lca"] = predicciones_lca
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Error en LCA StepMix: {e}")
+        # Variables placeholder para que el resto del tab no crashee
+        resultados_lca = {k: {"aic": 0, "bic": 0} for k in range(2, 7)}
+        tabla_lca = pd.DataFrame({"Clases (K)": range(2, 7), "AIC": [0]*5, "BIC": [0]*5})
+        predicciones_lca = np.zeros(len(df), dtype=int)
+        df["mixed_pred_rfm"] = predicciones_lca
+    else:
+        resultados_lca  = st.session_state["resultados_lca"]
+        tabla_lca       = st.session_state["tabla_lca"]
+        predicciones_lca = st.session_state["predicciones_lca"]
+        df["mixed_pred_rfm"] = predicciones_lca
+        st.success("✅ LCA StepMix ejecutado y en caché.")
 
     # --- SECCIÓN A: ENFOQUE GEOMÉTRICO (K-MEANS) ---
     st.subheader("1. Optimización Geométrica: K-Means Clustering")
@@ -1105,11 +1133,15 @@ with tab4:
     """)
 
     # Obtenemos los datos de la función con caché
-    try:
-        with st.spinner("Generando perfilamiento avanzado..."):
-            tabla_maestra_lca, df_lca = generar_perfilamiento_lca_v2(df)
-    except Exception as e:
-        st.error(f"Error en perfilamiento LCA: {e}")
+    if st.session_state.get("lca_done", False):
+        try:
+            with st.spinner("Generando perfilamiento avanzado..."):
+                tabla_maestra_lca, df_lca = generar_perfilamiento_lca_v2(df)
+        except Exception as e:
+            st.error(f"Error en perfilamiento: {e}")
+            st.stop()
+    else:
+        st.warning("⚠️ Ejecuta primero el modelo LCA en el Tab 2 para ver el perfilamiento.")
         st.stop()  # <-- _v2 aquí también
 
     # 1. Tabla Maestra de Perfilamiento
