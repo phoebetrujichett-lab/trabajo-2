@@ -250,7 +250,10 @@ def chart_radar_segmentos(file_path):
     vars_r  = ["total_spend","num_customizations","customer_satisfaction","cart_size","is_rewards_member","has_food_item","order_ahead"]
     labels_r = ["Gasto","Personaliz.","Satisfaccion","Carrito","Rewards","Comida","Antelado"]
     perf = df_r.groupby("Segmento")[vars_r].mean()
-    perf_norm = (perf - perf.min()) / (perf.max() - perf.min())
+    # Normalización con piso 0.15 → Clientes Ocasionales visible como polígono
+    _rng = perf.max() - perf.min()
+    _rng[_rng == 0] = 1          # evita división por cero si una variable no varía
+    perf_norm = 0.15 + 0.85 * (perf - perf.min()) / _rng
     N = len(vars_r)
     angles = [n/float(N)*2*np.pi for n in range(N)] + [0]
     fig, axes = plt.subplots(2, 2, figsize=(12, 10), subplot_kw=dict(polar=True))
@@ -268,6 +271,100 @@ def chart_radar_segmentos(file_path):
         ax.set_title(seg, fontsize=11, fontweight="bold", pad=15, color=color)
         ax.spines["polar"].set_color("#D4E9E2"); ax.grid(color="#D4E9E2", linewidth=0.5)
     fig.suptitle("Perfil Multidimensional de Segmentos RFM", fontsize=14, fontweight="bold", y=1.01, color=SBX_DARK)
+    plt.tight_layout()
+    return fig
+
+
+
+@st.cache_data
+def chart_categorias_demo(file_path):
+    """Barras agrupadas de variables categóricas por segmento socio-demográfico."""
+    df = load_data(file_path)
+    df_prep_local = df.copy()
+    age_map = {"18-24":1,"25-34":2,"35-44":3,"45-54":4,"55+":5}
+    df_prep_local["customer_age_group"] = df_prep_local["customer_age_group"].map(age_map)
+    cols_enc = ["order_channel","region","customer_gender","store_location_type"]
+    df_enc = pd.get_dummies(df_prep_local, columns=cols_enc, drop_first=False)
+    X = StandardScaler().fit_transform(df_enc.select_dtypes(include=[np.number]).fillna(0))
+    df["Cluster_Demo"] = KMeans(n_clusters=3, random_state=42, n_init=10).fit_predict(X)
+    canal_modal = df.groupby("Cluster_Demo")["order_channel"].agg(lambda x: x.mode()[0])
+    nombres_demo = {}
+    for c in df["Cluster_Demo"].unique():
+        canal = canal_modal[c]
+        if "Mobile App" in canal or "Kiosk" in canal:
+            nombres_demo[c] = "Clientes Digitales Jovenes"
+        elif "Drive-Thru" in canal or "In-Store" in canal:
+            nombres_demo[c] = "Clientes Adultos Presenciales"
+        else:
+            nombres_demo[c] = "Clientes Tradicionales Medios"
+    df["Segmento_Demo"] = df["Cluster_Demo"].map(nombres_demo)
+    vars_cat = ["customer_age_group","customer_gender","order_channel","store_location_type"]
+    titulos  = ["Grupo de edad","Genero","Canal de pedido","Tipo de tienda"]
+    pal_cat  = [SBX_GREEN, SBX_GOLD, "#5B8DB8", "#CB4335", "#8B5EA0", "#D85A30"]
+    fig, axes = plt.subplots(2, 2, figsize=(16, 11))
+    fig.patch.set_facecolor("#f8faf9")
+    for ax, col, tit in zip(axes.flatten(), vars_cat, titulos):
+        cross = df.groupby(["Segmento_Demo", col]).size().unstack(fill_value=0)
+        cross_pct = cross.div(cross.sum(axis=1), axis=0) * 100
+        cross_pct.plot(kind="bar", ax=ax,
+                       color=pal_cat[:cross_pct.shape[1]],
+                       edgecolor="white", width=0.65)
+        ax.set_title(tit, fontsize=12, fontweight="bold", color=SBX_DARK)
+        ax.set_xlabel("")
+        ax.set_ylabel("% dentro del segmento", fontsize=10, color=SBX_DARK)
+        ax.tick_params(axis="x", rotation=20, labelsize=9)
+        ax.tick_params(axis="y", labelcolor=SBX_DARK)
+        ax.legend(fontsize=8, loc="upper right", framealpha=0.8)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+    fig.suptitle("Composicion de segmentos socio-demograficos por variable categorica",
+                 fontsize=13, fontweight="bold", color=SBX_DARK, y=1.01)
+    plt.tight_layout()
+    return fig
+
+
+@st.cache_data
+def chart_torta_demo(file_path):
+    """Torta de distribucion de clientes por segmento socio-demografico."""
+    df = load_data(file_path)
+    df_prep_local = df.copy()
+    age_map = {"18-24":1,"25-34":2,"35-44":3,"45-54":4,"55+":5}
+    df_prep_local["customer_age_group"] = df_prep_local["customer_age_group"].map(age_map)
+    cols_enc = ["order_channel","region","customer_gender","store_location_type"]
+    df_enc = pd.get_dummies(df_prep_local, columns=cols_enc, drop_first=False)
+    X = StandardScaler().fit_transform(df_enc.select_dtypes(include=[np.number]).fillna(0))
+    df["Cluster_Demo"] = KMeans(n_clusters=3, random_state=42, n_init=10).fit_predict(X)
+    canal_modal = df.groupby("Cluster_Demo")["order_channel"].agg(lambda x: x.mode()[0])
+    nombres_demo = {}
+    for c in df["Cluster_Demo"].unique():
+        canal = canal_modal[c]
+        if "Mobile App" in canal or "Kiosk" in canal:
+            nombres_demo[c] = "Clientes Digitales Jovenes"
+        elif "Drive-Thru" in canal or "In-Store" in canal:
+            nombres_demo[c] = "Clientes Adultos Presenciales"
+        else:
+            nombres_demo[c] = "Clientes Tradicionales Medios"
+    df["Segmento_Demo"] = df["Cluster_Demo"].map(nombres_demo)
+    conteo = df.groupby("Segmento_Demo")["customer_id"].nunique().reset_index()
+    conteo.columns = ["Segmento", "N_Clientes"]
+    fig, ax = plt.subplots(figsize=(9, 7))
+    fig.patch.set_facecolor("white")
+    colores_torta = [SBX_GREEN, "#E07B39", "#5B8DB8"]
+    wedges, texts, autotexts = ax.pie(
+        conteo["N_Clientes"],
+        labels=conteo["Segmento"],
+        colors=colores_torta[:len(conteo)],
+        autopct="%1.1f%%",
+        startangle=120,
+        pctdistance=0.78,
+        wedgeprops=dict(edgecolor="white", linewidth=2.5)
+    )
+    for t in texts:
+        t.set_fontsize(11); t.set_color(SBX_DARK); t.set_fontweight("bold")
+    for at in autotexts:
+        at.set_fontsize(12); at.set_color("white"); at.set_fontweight("bold")
+    ax.set_title("Distribucion de clientes por segmento socio-demografico",
+                 fontsize=13, fontweight="bold", color=SBX_DARK, pad=18)
     plt.tight_layout()
     return fig
 
@@ -845,6 +942,20 @@ with tab2:
         Los resultados confirman que la inflexión matemática ocurre exactamente en **4 Clases Latentes**, validando la solidez de la estructura de segmentos elegida para Starbucks.
         """)
         st.success("La columna predictiva de pertenencia mixta `mixed_pred_rfm` ha sido calculada y consolidada con éxito para los análisis cruzados.")
+
+
+    st.divider()
+    st.subheader("3. Distribucion de Clientes por Segmento Socio-Demografico")
+    st.markdown("Proporcion de clientes asignados a cada segmento conductual identificado por K-Means.")
+    fig_torta_d = chart_torta_demo(FILE_NAME)
+    st.pyplot(fig_torta_d)
+    plt.close()
+
+    st.subheader("4. Composicion por Variable Categorica")
+    st.markdown("Perfil de cada segmento segun grupo de edad, genero, canal de pedido y tipo de tienda.")
+    fig_cat_d = chart_categorias_demo(FILE_NAME)
+    st.pyplot(fig_cat_d)
+    plt.close()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 3 — MODELO RFM
