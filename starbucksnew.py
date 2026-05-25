@@ -1026,7 +1026,60 @@ with tab4:
         height=450
     )
     st.plotly_chart(fig_heat, use_container_width=True)
-    
+# ── AÑADIR ESTO AL FINAL DEL WITH TAB4 ────────────────────────────────────
+    st.divider()
+    st.subheader("🌐 Espacio Tridimensional de Valor Financiero (RFM)")
+    st.markdown("""
+    Inspeccione la distribución geométrica tridimensional de los clientes utilizando sus métricas financieras reales. 
+    Permite identificar visualmente los límites de corte del algoritmo K-Means.
+    """)
+
+    # 1. Recuperamos los datos de la matriz financiera previamente calculada
+    df_rfm_copia = generar_base_rfm(df).copy()
+
+    # 2. Definimos los nombres estratégicos asignados a cada ID de cluster
+    rfm_names_map = {
+        0: "VIP",
+        1: "Inactivos",
+        2: "Activos Pro",
+        3: "Activos Lite"
+    }
+    df_rfm_copia['Segmento_RFM'] = df_rfm_copia['Cluster_RFM'].map(rfm_names_map)
+
+    # 3. Construcción del gráfico con Plotly Express
+    # OPTIMIZACIÓN: Usamos .sample() para graficar una muestra representativa de los 100k registros 
+    # y evitar que el navegador local o la nube se congelen por exceso de uso de memoria gráfica.
+    fig_3d_rfm = px.scatter_3d(
+        df_rfm_copia.sample(min(4000, len(df_rfm_copia)), random_state=42), 
+        x='Recency_days',            # Eje X: Días de inactividad (escala real)
+        y='Frequency',               # Eje Y: Cantidad de órdenes únicas
+        z='Monetary',                # Eje Z: Gasto total acumulado ($)
+        color='Segmento_RFM',        # Segmentación por colores cualitativos discretos
+        labels={
+            'Recency_days': 'Inactividad (Días)', 
+            'Frequency': 'Frecuencia (Órdenes)', 
+            'Monetary': 'Monto Acumulado Gasto ($)',
+            'Segmento_RFM': 'Segmento'
+        },
+        color_discrete_sequence=px.colors.qualitative.Vivid, # Máxima diferenciación de color web
+        opacity=0.75,                # Opacidad para detectar densidad de puntos
+        height=750                   # Altura ideal para visualización en pantallas
+    )
+
+    # 4. Ajustes estéticos de entorno y diseño ejecutivo
+    fig_3d_rfm.update_layout(
+        legend_title_text='Segmentos Financieros',
+        legend=dict(yanchor="top", y=0.9, xanchor="left", x=0.05),
+        margin=dict(l=0, r=0, b=0, t=50), # Expande el gráfico al máximo ancho disponible
+        scene=dict(
+            xaxis=dict(backgroundcolor="rgba(245, 245, 250, 0.5)", gridcolor="white", showbackground=True),
+            yaxis=dict(backgroundcolor="rgba(245, 245, 250, 0.5)", gridcolor="white", showbackground=True),
+            zaxis=dict(backgroundcolor="rgba(245, 245, 250, 0.5)", gridcolor="white", showbackground=True)
+        )
+    )
+
+    # 5. RENDERIZADO WEB SEGURO: Reemplaza tu .show() original
+    st.plotly_chart(fig_3d_rfm, use_container_width=True)    
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 5 — RECOMENDACIONES
