@@ -395,8 +395,6 @@ def style_matplotlib():
         "axes.spines.right": False,
         "axes.titlesize":    13,
         "axes.titleweight":  "bold",
-        "axes.titlecolor":   "#1e3932",
-        "axes.labelcolor":   "#1e3932",
         "axes.labelsize":    11,
         "xtick.color":       "#1e3932",
         "ytick.color":       "#1e3932",
@@ -855,17 +853,14 @@ with tab1:
 
 
     st.divider()
-    st.subheader("8. Patrones de Demanda Horaria")
-    st.markdown("Volumen de pedidos y gasto promedio hora a hora, con franjas horarias diferenciadas.")
-    fig_dh = chart_demanda_horaria(FILE_NAME)
-    st.pyplot(fig_dh)
-    plt.close()
+    if st.button("📊 Mostrar análisis temporales", key="btn_temporal"):
+        st.subheader("8. Patrones de Demanda Horaria")
+        fig_dh = chart_demanda_horaria(FILE_NAME)
+        st.pyplot(fig_dh); plt.close()
 
-    st.subheader("9. Evolución Mensual de Pedidos y Gasto")
-    st.markdown("Tendencia del negocio mes a mes desde enero 2024 hasta diciembre 2025.")
-    fig_em = chart_evolucion_mensual(FILE_NAME)
-    st.pyplot(fig_em)
-    plt.close()
+        st.subheader("9. Evolución Mensual de Pedidos y Gasto")
+        fig_em = chart_evolucion_mensual(FILE_NAME)
+        st.pyplot(fig_em); plt.close()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 2 — MODELO SOCIODEMOGRÁFICO
@@ -1015,17 +1010,14 @@ with tab2:
 
 
     st.divider()
-    st.subheader("3. Distribucion de Clientes por Segmento Socio-Demografico")
-    st.markdown("Proporcion de clientes asignados a cada segmento conductual identificado por K-Means.")
-    fig_torta_d = chart_torta_demo(FILE_NAME)
-    st.pyplot(fig_torta_d)
-    plt.close()
+    if st.button("📊 Mostrar perfil socio-demográfico", key="btn_demo_charts"):
+        st.subheader("3. Distribución de Clientes por Segmento")
+        fig_torta_d = chart_torta_demo(FILE_NAME)
+        st.pyplot(fig_torta_d); plt.close()
 
-    st.subheader("4. Composicion por Variable Categorica")
-    st.markdown("Perfil de cada segmento segun grupo de edad, genero, canal de pedido y tipo de tienda.")
-    fig_cat_d = chart_categorias_demo(FILE_NAME)
-    st.pyplot(fig_cat_d)
-    plt.close()
+        st.subheader("4. Composición por Variable Categórica")
+        fig_cat_d = chart_categorias_demo(FILE_NAME)
+        st.pyplot(fig_cat_d); plt.close()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 3 — MODELO RFM
@@ -1065,11 +1057,22 @@ with tab3:
     st.subheader("Optimización matemática de K-Means")
     st.markdown("Evaluación paralela del comportamiento de la varianza interna y la cohesión de los grupos:")
 
-    with st.spinner("Evaluando métricas de optimización para K-Means tradicional..."):
-        k_rango, inertias_rfm, sils_rfm = calcular_diagnostico_rfm_kmeans(rfm_completo)
+    if st.button("📈 Calcular métricas de validación K-Means", key="btn_diag"):
+        with st.spinner("Calculando métricas..."):
+            k_rango, inertias_rfm, sils_rfm = calcular_diagnostico_rfm_kmeans(rfm_completo)
+            st.session_state["k_rango"]      = k_rango
+            st.session_state["inertias_rfm"] = inertias_rfm
+            st.session_state["sils_rfm"]     = sils_rfm
+    if "k_rango" in st.session_state:
+        k_rango      = st.session_state["k_rango"]
+        inertias_rfm = st.session_state["inertias_rfm"]
+        sils_rfm     = st.session_state["sils_rfm"]
+    else:
+        k_rango = inertias_rfm = sils_rfm = None
 
-    # Despliegue de los gráficos en el lienzo de Streamlit
-    fig_diag, axes_diag = plt.subplots(1, 2, figsize=(14, 5))
+    if k_rango is not None:
+     # Despliegue de los gráficos en el lienzo de Streamlit
+     fig_diag, axes_diag = plt.subplots(1, 2, figsize=(14, 5))
     fig_diag.patch.set_facecolor("#f8faf9")
 
     # Gráfico de Inercia (Método del Codo) utilizando la paleta del panel
@@ -1140,11 +1143,10 @@ with tab3:
     st.divider()
 
     # --- RADAR COMPLEMENTARIO MULTIDIMENSIONAL ---
-    st.subheader("Perfil Multidimensional de Segmentos (7 dimensiones)")
-    st.markdown("Radar comparativo de cada segmento en variables de comportamiento, gasto y lealtad.")
-    fig_r8 = chart_radar_segmentos(FILE_NAME)
-    st.pyplot(fig_r8)
-    plt.close()
+    if st.button("📡 Mostrar perfil multidimensional", key="btn_radar"):
+        st.subheader("Perfil Multidimensional de Segmentos (7 dimensiones)")
+        fig_r8 = chart_radar_segmentos(FILE_NAME)
+        st.pyplot(fig_r8); plt.close()
     
     
 # ══════════════════════════════════════════════════════════════════════════════
