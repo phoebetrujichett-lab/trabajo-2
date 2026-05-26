@@ -483,47 +483,56 @@ def generar_perfilamiento_lca_v2(df_input):
 
 @st.cache_data
 def calcular_lca_mixto(df_input):
-    # Muestreo estratégico: LCA en 100k filas colapsa la RAM de Streamlit Cloud
-    MAX_LCA = 8000
-    if len(df_input) > MAX_LCA:
-        df_lca = df_input.sample(MAX_LCA, random_state=42).copy()
-    else:
-        df_lca = df_input.copy()
-    
-    # Definición de variables según tu modelo jerárquico mixto
-    gaussianas = ['total_spend', 'customer_satisfaction', 'fulfillment_time_min'] 
-    variables_categoricas = ['customer_gender', 'store_location_type', 'order_channel', 'region', 'categoria_dia', 'momento_dia', 'customer_age_group']
-    binarias = ['is_rewards_member']
+    gaussianas          = ['total_spend', 'customer_satisfaction', 'fulfillment_time_min']
+    variables_categoricas = ['customer_gender', 'store_location_type', 'order_channel',
+                             'region', 'categoria_dia', 'momento_dia', 'customer_age_group']
+    binarias            = ['is_rewards_member']
 
-    # Transformación explícita a códigos categóricos para StepMix
-    for col in variables_categoricas:
-        df_lca[col] = df_lca[col].astype('category').cat.codes
-    for col in binarias:
-        df_lca[col] = df_lca[col].astype(int)
+    def preparar_df(df_raw):
+        """Aplica las mismas transformaciones a cualquier subconjunto del df."""
+        df_out = df_raw.copy()
+        for col in variables_categoricas:
+            df_out[col] = df_out[col].astype('category').cat.codes
+        for col in binarias:
+            df_out[col] = df_out[col].astype(int)
+        return df_out
 
-    # Llamada segura a tu descriptor mixto global
-    mm_data, mm_descriptor = get_mixed_descriptor(
-        dataframe=df_lca, 
-        gaussian=gaussianas,      
-        categorical=variables_categoricas, 
-        binary=binarias         
+    # ── Muestra para ENTRENAR (rápido, bajo RAM) ──────────────────────────────
+    MAX_LCA = 3000
+    df_train = preparar_df(df_input.sample(min(MAX_LCA, len(df_input)), random_state=42))
+
+    mm_data_train, mm_descriptor = get_mixed_descriptor(
+        dataframe=df_train,
+        gaussian=gaussianas,
+        categorical=variables_categoricas,
+        binary=binarias
     )
 
-    # Bucle de optimización de clases
+    # Bucle BIC/AIC (k=3,4,5 — rango reducido para velocidad)
     results = {}
-    for n_classes in range(2, 7):
-        model = StepMix(n_components=n_classes, measurement=mm_descriptor, 
-                        random_state=42, n_init=5, max_iter=50)
-        model.fit(mm_data)
+    for n_classes in range(3, 6):
+        model = StepMix(n_components=n_classes, measurement=mm_descriptor,
+                        random_state=42, n_init=1, max_iter=30)
+        model.fit(mm_data_train)
         results[n_classes] = {
-            'aic': model.aic(mm_data),
-            'bic': model.bic(mm_data)
+            'aic': model.aic(mm_data_train),
+            'bic': model.bic(mm_data_train)
         }
 
-    # Ajuste del modelo definitivo con K=4 componentes consolidados
-    model_final = StepMix(n_components=4, measurement=mm_descriptor, random_state=123, n_init=5)
-    model_final.fit(mm_data)
-    predicciones = model_final.predict(mm_data)
+    # Modelo final entrenado con la muestra
+    model_final = StepMix(n_components=4, measurement=mm_descriptor,
+                          random_state=123, n_init=1, max_iter=100)
+    model_final.fit(mm_data_train)
+
+    # ── Predecir sobre el df COMPLETO (100k filas) ────────────────────────────
+    df_full = preparar_df(df_input)
+    mm_data_full, _ = get_mixed_descriptor(
+        dataframe=df_full,
+        gaussian=gaussianas,
+        categorical=variables_categoricas,
+        binary=binarias
+    )
+    predicciones = model_final.predict(mm_data_full)   # len = len(df_input)
 
     return results, tragic_errors_avoided_df(results), predicciones
 
