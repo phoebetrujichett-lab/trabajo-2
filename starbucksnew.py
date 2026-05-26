@@ -439,7 +439,8 @@ def calcular_metricas_kmeans(df_preprocesado):
     return inercias, silhouette_dict, tabla_comparativa, df_scaled
 
 @st.cache_data
-def generar_perfilamiento_lca_v2(df_input):
+def generar_perfilamiento_lca_v2(file_path):
+    df_input = load_data(file_path)
     # Muestreo para limitar RAM en Streamlit Cloud
     MAX_PERF = 10000
     df_sample = df_input.sample(min(MAX_PERF, len(df_input)), random_state=42)
@@ -480,7 +481,8 @@ def generar_perfilamiento_lca_v2(df_input):
     return tabla, df_completo
 
 @st.cache_data
-def calcular_lca_mixto(df_input):
+def calcular_lca_mixto(file_path):
+    df_input = load_data(file_path)
     gaussianas          = ['total_spend', 'customer_satisfaction', 'fulfillment_time_min']
     variables_categoricas = ['customer_gender', 'store_location_type', 'order_channel',
                              'region', 'categoria_dia', 'momento_dia', 'customer_age_group']
@@ -897,7 +899,7 @@ with tab2:
         if st.button("▶ Ejecutar LCA StepMix", type="primary"):
             try:
                 with st.spinner("Ejecutando StepMix LCA (puede tardar 1-2 min)..."):
-                    resultados_lca, tabla_lca, predicciones_lca = calcular_lca_mixto(df)
+                    resultados_lca, tabla_lca, predicciones_lca = calcular_lca_mixto(FILE_NAME)
                     df["mixed_pred_rfm"] = predicciones_lca
                     st.session_state["lca_done"] = True
                     st.session_state["resultados_lca"] = resultados_lca
@@ -1026,10 +1028,12 @@ with tab3:
     st.header("Análisis de Valor Financiero (RFM)")
 
     # Carga de la matriz transaccional agrupada por cliente único
-    with st.spinner("Construyendo matriz transaccional por cliente..."):
-        rfm_completo = generar_base_rfm(df)
-        columnas_rfm = ['Recency', 'Frequency', 'Monetary']
-        df_rfm_analisis = rfm_completo[columnas_rfm]
+    if "rfm_completo" not in st.session_state:
+        with st.spinner("Construyendo matriz RFM..."):
+            st.session_state["rfm_completo"] = generar_base_rfm(FILE_NAME)
+    rfm_completo = st.session_state["rfm_completo"]
+    columnas_rfm = ['Recency', 'Frequency', 'Monetary']
+    df_rfm_analisis = rfm_completo[columnas_rfm]
 
     # --- MÉTRICAS GENERALES EN ESCALA REAL ---
     c1, c2, c3 = st.columns(3)
@@ -1164,7 +1168,7 @@ with tab4:
     if st.session_state.get("lca_done", False):
         try:
             with st.spinner("Generando perfilamiento avanzado..."):
-                tabla_maestra_lca, df_lca = generar_perfilamiento_lca_v2(df)
+                tabla_maestra_lca, df_lca = generar_perfilamiento_lca_v2(FILE_NAME)
         except Exception as e:
             st.error(f"Error en perfilamiento: {e}")
             st.stop()
@@ -1226,7 +1230,9 @@ with tab4:
     """)
 
     # 1. Recuperamos los datos de la matriz financiera previamente calculada
-    df_rfm_copia = generar_base_rfm(df).copy()
+    if "rfm_completo" not in st.session_state:
+        st.session_state["rfm_completo"] = generar_base_rfm(FILE_NAME)
+    df_rfm_copia = st.session_state["rfm_completo"].copy()
 
     # 2. Definimos los nombres estratégicos asignados a cada ID de cluster
     rfm_names_map = {
