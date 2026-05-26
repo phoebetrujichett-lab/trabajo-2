@@ -1145,7 +1145,37 @@ with tab3:
     fig_r8 = chart_radar_segmentos(FILE_NAME)
     st.pyplot(fig_r8)
     plt.close()
-    
+    st.divider()
+st.subheader("Distribución de clientes por segmento")
+
+conteo_segmentos = (
+    rfm_completo["Cluster_RFM"]
+    .value_counts()
+    .reset_index()
+)
+
+conteo_segmentos.columns=["Segmento","Clientes"]
+
+fig_seg = px.pie(
+    conteo_segmentos,
+    values="Clientes",
+    names="Segmento",
+    hole=0.5,
+    color="Segmento",
+    color_discrete_sequence=[
+        SBX_GREEN,
+        SBX_GOLD,
+        SBX_DARK,
+        "#5B8DB8"
+    ]
+)
+
+fig_seg.update_layout(
+    height=450,
+    title="Participación de clientes por segmento RFM"
+)
+
+st.plotly_chart(fig_seg,use_container_width=True)
     
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 4 — SEGMENTACIÓN CRUZADA
