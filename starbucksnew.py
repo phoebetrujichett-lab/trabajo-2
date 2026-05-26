@@ -1146,6 +1146,61 @@ with tab3:
     st.pyplot(fig_r8)
     plt.close()
     
+    #HEATMAP RFM
+st.divider()
+st.subheader("Perfil promedio de segmentos RFM")
+
+perfil_cluster=(
+    rfm_completo
+    .groupby("Cluster_RFM")
+    [["Recency_days","Frequency","Monetary"]]
+    .mean()
+)
+
+fig_heat,ax=plt.subplots(
+    figsize=(10,4)
+)
+
+sns.heatmap(
+    perfil_cluster,
+    annot=True,
+    cmap="YlGn",
+    fmt=".1f",
+    linewidths=.5
+)
+
+plt.title(
+    "Promedios RFM por segmento",
+    fontsize=13,
+    fontweight="bold"
+)
+
+st.pyplot(fig_heat)
+
+plt.close()
+
+
+st.caption("""
+Interpretación:
+
+El heatmap resume el comportamiento promedio de cada grupo
+utilizando Recencia, Frecuencia y Valor Monetario.
+
+Permite identificar qué dimensión explica la separación entre
+segmentos y facilita una lectura rápida del clustering.
+
+Valores más intensos indican mayor presencia relativa
+de esa característica dentro del grupo.
+
+Ejemplos:
+
+• Alta frecuencia + alto gasto → clientes estratégicos.
+
+• Alta inactividad → clientes en riesgo.
+
+• Baja frecuencia + bajo gasto → clientes ocasionales.
+""")
+
    
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 4 — SEGMENTACIÓN CRUZADA
