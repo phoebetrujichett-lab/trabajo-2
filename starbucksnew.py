@@ -1146,68 +1146,9 @@ with tab3:
     st.pyplot(fig_r8)
     plt.close()
     
-    #distribucion clientes por segmento
-    st.divider()
-st.subheader("Distribución de clientes por segmento")
-
-conteo_segmentos = (
-    rfm_completo["Cluster_RFM"]
-    .value_counts()
-    .reset_index()
-)
-
-conteo_segmentos.columns=["Segmento","Clientes"]
-
-fig_seg = px.pie(
-    conteo_segmentos,
-    values="Clientes",
-    names="Segmento",
-    hole=0.5,
-    color="Segmento",
-    color_discrete_sequence=[
-        SBX_GREEN,
-        SBX_GOLD,
-        SBX_DARK,
-        "#5B8DB8"
-    ]
-)
-
-fig_seg.update_layout(
-    height=450,
-    title="Participación de clientes por segmento RFM"
-)
-
-st.plotly_chart(fig_seg,use_container_width=True)
-#perfil promedio por segmento
-st.divider()
-st.subheader("Perfil promedio por segmento")
-
-perfil_cluster = (
-    rfm_completo
-    .groupby("Cluster_RFM")
-    [["Recency_days","Frequency","Monetary"]]
-    .mean()
-)
-
-fig_heat,ax=plt.subplots(figsize=(10,4))
-
-sns.heatmap(
-    perfil_cluster,
-    annot=True,
-    cmap="YlGn",
-    fmt=".1f",
-    linewidths=.5
-)
+   
 
 plt.title(
-    "Promedios RFM por Cluster",
-    fontsize=13,
-    fontweight="bold"
-)
-
-st.pyplot(fig_heat)
-plt.close()    
-
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 4 — SEGMENTACIÓN CRUZADA
 # ══════════════════════════════════════════════════════════════════════════════
