@@ -1182,22 +1182,14 @@ plt.close()
 
 st.caption("""
 Interpretación:
-
 El heatmap resume el comportamiento promedio de cada grupo
-utilizando Recencia, Frecuencia y Valor Monetario.
-
-Permite identificar qué dimensión explica la separación entre
-segmentos y facilita una lectura rápida del clustering.
-
-Valores más intensos indican mayor presencia relativa
+utilizando Recencia, Frecuencia y Valor Monetario. Permite identificar qué dimensión explica la separación entre
+segmentos y facilita una lectura rápida del clustering. Valores más intensos indican mayor presencia relativa
 de esa característica dentro del grupo.
 
 Ejemplos:
-
 • Alta frecuencia + alto gasto → clientes estratégicos.
-
 • Alta inactividad → clientes en riesgo.
-
 • Baja frecuencia + bajo gasto → clientes ocasionales.
 """)
 
