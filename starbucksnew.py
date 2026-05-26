@@ -1145,6 +1145,8 @@ with tab3:
     fig_r8 = chart_radar_segmentos(FILE_NAME)
     st.pyplot(fig_r8)
     plt.close()
+    
+    #distribucion clientes por segmento
     st.divider()
 st.subheader("Distribución de clientes por segmento")
 
@@ -1176,7 +1178,36 @@ fig_seg.update_layout(
 )
 
 st.plotly_chart(fig_seg,use_container_width=True)
-    
+#perfil promedio por segmento
+st.divider()
+st.subheader("Perfil promedio por segmento")
+
+perfil_cluster = (
+    rfm_completo
+    .groupby("Cluster_RFM")
+    [["Recency_days","Frequency","Monetary"]]
+    .mean()
+)
+
+fig_heat,ax=plt.subplots(figsize=(10,4))
+
+sns.heatmap(
+    perfil_cluster,
+    annot=True,
+    cmap="YlGn",
+    fmt=".1f",
+    linewidths=.5
+)
+
+plt.title(
+    "Promedios RFM por Cluster",
+    fontsize=13,
+    fontweight="bold"
+)
+
+st.pyplot(fig_heat)
+plt.close()    
+
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 4 — SEGMENTACIÓN CRUZADA
 # ══════════════════════════════════════════════════════════════════════════════
