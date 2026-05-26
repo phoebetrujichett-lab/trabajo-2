@@ -1,4 +1,3 @@
-# Versión: 2026-05-26 01:57 — Fix aplicado
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -473,12 +472,9 @@ def generar_perfilamiento_lca_v2(df_input):
 
 @st.cache_data
 def calcular_lca_mixto(df_input):
-    # Muestreo estratégico: LCA en 100k filas colapsa la RAM de Streamlit Cloud
-    MAX_LCA = 8000
-    if len(df_input) > MAX_LCA:
-        df_lca = df_input.sample(MAX_LCA, random_state=42).copy()
-    else:
-        df_lca = df_input.copy()
+    # Muestra reducida: suficiente para LCA estable, dramáticamente más rápido
+    MAX_LCA = 3000
+    df_lca = df_input.sample(min(MAX_LCA, len(df_input)), random_state=42).copy()
     
     # Definición de variables según tu modelo jerárquico mixto
     gaussianas = ['total_spend', 'customer_satisfaction', 'fulfillment_time_min'] 
@@ -501,9 +497,9 @@ def calcular_lca_mixto(df_input):
 
     # Bucle de optimización de clases
     results = {}
-    for n_classes in range(2, 7):
-        model = StepMix(n_components=n_classes, measurement=mm_descriptor, 
-                        random_state=42, n_init=5, max_iter=50)
+    for n_classes in range(3, 6):  # k=3,4,5 — rango reducido para velocidad
+        model = StepMix(n_components=n_classes, measurement=mm_descriptor,
+                        random_state=42, n_init=1, max_iter=30)
         model.fit(mm_data)
         results[n_classes] = {
             'aic': model.aic(mm_data),
@@ -511,7 +507,7 @@ def calcular_lca_mixto(df_input):
         }
 
     # Ajuste del modelo definitivo con K=4 componentes consolidados
-    model_final = StepMix(n_components=4, measurement=mm_descriptor, random_state=123, n_init=5)
+    model_final = StepMix(n_components=4, measurement=mm_descriptor, random_state=123, n_init=1, max_iter=100)
     model_final.fit(mm_data)
     predicciones = model_final.predict(mm_data)
 
@@ -876,7 +872,7 @@ with tab2:
                 "Haz clic para ejecutarlo cuando estés listo.")
         if st.button("▶ Ejecutar LCA StepMix", type="primary"):
             try:
-                with st.spinner("Ejecutando StepMix LCA (puede tardar 1-2 min)..."):
+                with st.spinner("Ejecutando StepMix LCA (30-90 segundos aprox.)..."):
                     resultados_lca, tabla_lca, predicciones_lca = calcular_lca_mixto(df)
                     df["mixed_pred_rfm"] = predicciones_lca
                     st.session_state["lca_done"] = True
@@ -887,8 +883,8 @@ with tab2:
             except Exception as e:
                 st.error(f"Error en LCA StepMix: {e}")
         # Variables placeholder para que el resto del tab no crashee
-        resultados_lca = {k: {"aic": 0, "bic": 0} for k in range(2, 7)}
-        tabla_lca = pd.DataFrame({"Clases (K)": range(2, 7), "AIC": [0]*5, "BIC": [0]*5})
+        resultados_lca = {k: {"aic": 0, "bic": 0} for k in range(3, 6)}
+        tabla_lca = pd.DataFrame({"Clases (K)": range(3, 6), "AIC": [0]*3, "BIC": [0]*3})
         predicciones_lca = np.zeros(len(df), dtype=int)
         df["mixed_pred_rfm"] = predicciones_lca
     else:
