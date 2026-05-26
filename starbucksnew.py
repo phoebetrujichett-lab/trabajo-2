@@ -1,3 +1,4 @@
+# Versión: 2026-05-26 01:57 — Fix aplicado
 import streamlit as st
 import pandas as pd
 import numpy as np
